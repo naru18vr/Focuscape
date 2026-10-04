@@ -6,6 +6,8 @@ const FILTERS: Record<SoundId, [BiquadFilterType, number]> = {
   ocean: ["lowpass", 2200], forest: ["lowpass", 7500], fireplace: ["lowpass", 4000],
 };
 
+export class AudioPlaybackError extends Error {}
+
 // Original procedural soundscapes. No recordings, external assets, or network requests.
 // Long stereo loops with a crossfade keep noise continuous at the loop boundary.
 function soundBuffer(ctx: AudioContext, id: SoundId): AudioBuffer {
@@ -89,7 +91,7 @@ export class AmbientAudio {
   async unlock() {
     if (!this.context) {
       const AudioCtor = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtor) throw new Error("このブラウザでは環境音を再生できません。最新版のブラウザでお試しください。");
+      if (!AudioCtor) throw new AudioPlaybackError("このブラウザでは環境音を再生できません。最新版のブラウザでお試しください。");
       const context = new AudioCtor();
       try {
         const master = context.createGain();
@@ -112,7 +114,7 @@ export class AmbientAudio {
     const context = this.context;
     if (context.state !== "running") await context.resume();
     if (this.context !== context) return; // Disposed while resume was pending.
-    if (context.state !== "running") throw new Error("音を再生できませんでした。もう一度「音を再生」を押してください。");
+    if (context.state !== "running") throw new AudioPlaybackError("音を再生できませんでした。もう一度「音を再生」を押してください。");
   }
 
   update(settings: Settings, playing: boolean, muted: boolean) {

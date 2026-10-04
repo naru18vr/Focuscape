@@ -23,11 +23,12 @@ export function Focuscape() {
   const enabledCount = sounds.filter(({ id }) => settings.sounds[id].enabled).length;
   const progress = Math.max(0, Math.min(1, timer.remainingMs / timer.durations[timer.phase]));
   const time = formatTime(timer.remainingMs);
+  const [minutes, seconds] = time.split(":").map(Number);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if (event.code === "Space" && !event.repeat && !settingsOpen && !target.closest("input, button, textarea, select, a, [contenteditable]")) {
+      if (event.code === "Space" && !event.repeat && !event.defaultPrevented && !event.isComposing && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && !settingsOpen && target instanceof HTMLElement && !target.closest("input, button, textarea, select, a, [contenteditable]")) {
         event.preventDefault(); toggleTimer();
       }
     };
@@ -52,7 +53,7 @@ export function Focuscape() {
 
         <div className="timer-face">
           <svg className="timer-ring" viewBox="0 0 360 360" aria-hidden="true"><circle className="ring-track" cx="180" cy="180" r="165" /><circle className="ring-progress" cx="180" cy="180" r="165" pathLength="1" strokeDasharray={`${progress} 1`} transform="rotate(-90 180 180)" /></svg>
-          <div className="timer-content"><span className="timer-label">{timer.phase === "focus" ? "FOCUS TIME" : "TAKE A BREAK"}</span><div className={`timer-digits ${time.length > 5 ? "long-time" : ""}`} role="timer" aria-label={`残り ${time}`} aria-live="off" data-testid="timer">{time}</div><span className="timer-status"><span className={timer.running ? "status-dot running" : "status-dot"} />{timer.running ? (timer.phase === "focus" ? "いま、集中しています" : "ゆっくり、ひと休み") : timer.remainingMs < timer.durations[timer.phase] ? "一時停止中" : "準備ができたら、始めましょう"}</span></div>
+          <div className="timer-content"><span className="timer-label">{timer.phase === "focus" ? "FOCUS TIME" : "TAKE A BREAK"}</span><div className={`timer-digits ${time.length > 5 ? "long-time" : ""}`} role="timer" aria-label={`残り ${minutes}分 ${seconds}秒`} aria-live="off" data-testid="timer">{time}</div><span className="timer-status"><span className={timer.running ? "status-dot running" : "status-dot"} />{timer.running ? (timer.phase === "focus" ? "いま、集中しています" : "ゆっくり、ひと休み") : timer.remainingMs < timer.durations[timer.phase] ? "一時停止中" : "準備ができたら、始めましょう"}</span></div>
         </div>
 
         <div className="timer-actions"><button className="start-button" onClick={toggleTimer} disabled={!ready}>{timer.running ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}<span>{timer.running ? "PAUSE" : "START"}</span></button><button className="reset-button" aria-label="タイマーをリセット" title="タイマーをリセット" disabled={!ready} onClick={() => { app.dispatch({ type: "reset" }); app.setMessage(""); }}><RotateCcw size={18} /></button></div>
@@ -75,7 +76,7 @@ export function Focuscape() {
         </div>
         <div className="mixer-footer">
           <div className="master-control"><button className="mute-button" aria-label={app.muted ? "ミュートを解除" : "すべての音をミュート"} aria-pressed={app.muted} onClick={() => app.setMuted(!app.muted)} disabled={!ready}>{app.muted || settings.masterVolume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}</button><label htmlFor="master-volume">Master Volume</label><input id="master-volume" aria-label="Master Volume" type="range" min="0" max="100" value={settings.masterVolume} disabled={!ready} style={{ "--range-progress": `${settings.masterVolume}%` } as CSSProperties} onChange={(e) => app.saveSettings({ ...settings, masterVolume: Number(e.target.value) })} /><span className="master-value">{settings.masterVolume}%</span></div>
-          <div className="mix-status"><AudioLines size={15} /><span>{enabledCount ? `${enabledCount}種類の音 ${app.playing && !app.muted && settings.masterVolume > 0 ? "をミックス中" : "を選択中"}` : "音のない静けさも、いいものです。"}</span></div>
+          <div className="mix-status"><AudioLines size={15} /><span>{enabledCount ? `${enabledCount}種類の音 ${app.pendingAudio ? "を準備中" : app.playing && !app.muted && settings.masterVolume > 0 ? "をミックス中" : "を選択中"}` : "音のない静けさも、いいものです。"}</span></div>
         </div>
       </section>
       <div className="inline-status" role="status" aria-live="polite">{app.message && <div className="completion-message"><Leaf size={17} /><span>{app.message}</span><button className="icon-button" aria-label="終了メッセージを閉じる" onClick={() => app.setMessage("")}><X size={15} /></button></div>}</div>

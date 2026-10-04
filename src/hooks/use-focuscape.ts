@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { AmbientAudio } from "@/lib/audio";
+import { AmbientAudio, AudioPlaybackError } from "@/lib/audio";
 import { DEFAULT_SETTINGS, parseSettings, STORAGE_KEY, type Settings, type SoundId } from "@/lib/settings";
 import { createTimer, timerReducer, formatTime } from "@/lib/timer";
 
@@ -10,6 +10,7 @@ export function useFocuscape() {
   const [ready, setReady] = useState(false);
   const [timer, dispatch] = useReducer(timerReducer, undefined, () => createTimer());
   const [playing, setPlaying] = useState(false);
+  const [pendingAudio, setPendingAudio] = useState(false);
   const [muted, setMuted] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -48,6 +49,7 @@ export function useFocuscape() {
       // Report an external audio API failure; disposal prevents repeated updates.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlaying(false);
+      setPendingAudio(false);
       setError("音を再生できませんでした。もう一度「音を再生」を押してください。");
     }
   }, [settings, ready, playing, muted]);
@@ -85,21 +87,23 @@ export function useFocuscape() {
 
   useEffect(() => {
     const label = timer.phase === "focus" ? "Focus" : "Break";
-    document.title = timer.running ? `${formatTime(timer.remainingMs)} · ${label} — Focuscape` : "Focuscape — ひとつのことに、深く。";
-  }, [timer.remainingMs, timer.running, timer.phase]);
+    document.title = timer.running || timer.remainingMs < timer.durations[timer.phase] ? `${formatTime(timer.remainingMs)} · ${label}${timer.running ? "" : "（一時停止）"} — Focuscape` : "Focuscape — ひとつのことに、深く。";
+  }, [timer.remainingMs, timer.running, timer.phase, timer.durations]);
 
   const playAudio = useCallback(async () => {
     const request = ++playbackRequest.current.id;
     // Show the stop control immediately, including while the browser resumes audio.
     setPlaying(true);
+    setPendingAudio(true);
     try {
       audio.current ??= new AmbientAudio();
       await audio.current.unlock();
-      if (request === playbackRequest.current.id) setError("");
+      if (request === playbackRequest.current.id) { setError(""); setPendingAudio(false); }
     } catch (cause) {
       if (request === playbackRequest.current.id) {
         setPlaying(false);
-        setError(cause instanceof Error ? cause.message : "音を再生できませんでした。もう一度お試しください。");
+        setPendingAudio(false);
+        setError(cause instanceof AudioPlaybackError ? cause.message : "音を再生できませんでした。もう一度「音を再生」を押してください。");
       }
     }
   }, []);
@@ -107,6 +111,7 @@ export function useFocuscape() {
   const stopAudio = () => {
     playbackRequest.current.id++;
     setPlaying(false);
+    setPendingAudio(false);
   };
 
   const toggleTimer = useCallback(() => {
@@ -135,6 +140,6 @@ export function useFocuscape() {
     }
   };
 
-  return { settings, ready, timer, dispatch, playing, muted, setMuted, message, setMessage, error, setError,
+  return { settings, ready, timer, dispatch, playing, pendingAudio, muted, setMuted, message, setMessage, error, setError,
     toggleTimer, toggleSound, togglePlayback, saveSettings };
 }

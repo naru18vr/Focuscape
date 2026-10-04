@@ -5,6 +5,22 @@ async function ready(page: Page) {
   await expect(page.getByRole("button", { name: "START", exact: true })).toBeEnabled();
 }
 
+async function readyClock(page: Page) {
+  const time = new Date("2030-01-01T00:00:00Z");
+  await page.clock.install({ time });
+  await ready(page);
+  // Real browser actions must not consume countdown time between assertions.
+  await page.clock.pauseAt(new Date(time.getTime() + 60_000));
+}
+
+const browserErrors = new WeakMap<Page, string[]>();
+test.beforeEach(({ page }) => {
+  const errors: string[] = [];
+  browserErrors.set(page, errors);
+  page.on("pageerror", (error) => errors.push(error.message));
+});
+test.afterEach(({ page }) => { expect(browserErrors.get(page)).toEqual([]); });
+
 async function setRange(page: Page, name: string, value: number) {
   await page.getByRole("slider", { name, exact: true }).evaluate((element, nextValue) => {
     const input = element as HTMLInputElement;
@@ -15,13 +31,13 @@ async function setRange(page: Page, name: string, value: number) {
 }
 
 test("start, pause, resume, reset and keyboard controls", async ({ page }) => {
-  await page.clock.install();
-  await ready(page);
+  await readyClock(page);
   await expect(page.getByTestId("timer")).toHaveText("25:00");
   await page.getByRole("button", { name: "START", exact: true }).click();
   await page.clock.fastForward(10_000);
   await expect(page.getByTestId("timer")).toHaveText("24:50");
   await page.getByRole("button", { name: "PAUSE", exact: true }).click();
+  await expect(page).toHaveTitle("24:50 · Focus（一時停止） — Focuscape");
   await page.clock.fastForward(20_000);
   await expect(page.getByTestId("timer")).toHaveText("24:50");
   await page.getByRole("button", { name: "START", exact: true }).click();
@@ -34,9 +50,21 @@ test("start, pause, resume, reset and keyboard controls", async ({ page }) => {
   await expect(page.getByRole("button", { name: "PAUSE", exact: true })).toBeVisible();
 });
 
-test("focus and break complete once, announce visually, and wait for START", async ({ page }) => {
-  await page.clock.install();
+test("Space shortcut respects IME, modifier keys, editable controls and dialogs", async ({ page }) => {
   await ready(page);
+  await expect(page.getByRole("timer")).toHaveAttribute("aria-label", "残り 25分 0秒");
+  for (const modifiers of [{ ctrlKey: true }, { altKey: true }, { shiftKey: true }, { metaKey: true }, { isComposing: true }, { repeat: true }]) {
+    await page.locator("body").dispatchEvent("keydown", { code: "Space", bubbles: true, ...modifiers });
+    await expect(page.getByRole("button", { name: "START", exact: true })).toBeVisible();
+  }
+  await page.getByRole("button", { name: "設定を開く" }).click();
+  await page.getByRole("spinbutton", { name: "集中時間（分）" }).dispatchEvent("keydown", { code: "Space", bubbles: true });
+  await page.getByRole("button", { name: "設定を閉じる" }).click();
+  await expect(page.getByRole("button", { name: "START", exact: true })).toBeVisible();
+});
+
+test("focus and break complete once, announce visually, and wait for START", async ({ page }) => {
+  await readyClock(page);
   await page.getByRole("button", { name: "START", exact: true }).click();
   await page.clock.fastForward(25 * 60_000);
   await expect(page.getByTestId("timer")).toHaveText("05:00");
@@ -84,6 +112,7 @@ test("all six real Web Audio channels start, mix, adjust and stop", async ({ pag
   });
   await ready(page);
   for (const name of ["Rain", "White Noise", "Cafe", "Ocean", "Forest", "Fireplace"]) await page.getByRole("button", { name: `${name} ON`, exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { audioTracking: { contexts: AudioContext[] } }).audioTracking.contexts[0].state)).toBe("running");
   await expect(page.getByText("6種類の音 をミックス中")).toBeVisible();
   const graph = await page.evaluate(() => {
     const data = (window as unknown as { audioTracking: { contexts: AudioContext[]; sources: AudioBufferSourceNode[] } }).audioTracking;
@@ -103,8 +132,7 @@ test("all six real Web Audio channels start, mix, adjust and stop", async ({ pag
 });
 
 test("auto-start begins the next phase; duration fields lock while running", async ({ page }) => {
-  await page.clock.install();
-  await ready(page);
+  await readyClock(page);
   await page.getByRole("button", { name: "設定を開く" }).click();
   await page.getByRole("checkbox", { name: /次のセッションを自動開始/ }).check();
   await page.getByRole("button", { name: "設定を保存" }).click();
@@ -130,24 +158,43 @@ test("corrupt storage and blocked audio preserve timer usability", async ({ page
     localStorage.setItem("focuscape.settings.v1", "{broken");
     window.AudioContext = class extends AudioContext { constructor() { super(); void this.close(); throw new Error("Audio blocked"); } };
   });
-  await page.clock.install();
-  await ready(page);
+  await readyClock(page);
   await page.getByRole("button", { name: "START", exact: true }).click();
-  await expect(page.locator(".error-message[role=alert]")).toContainText("Audio blocked");
+  await expect(page.locator(".error-message[role=alert]")).toContainText("音を再生できませんでした");
   await expect(page.getByRole("button", { name: "PAUSE", exact: true })).toBeVisible();
   await page.clock.fastForward(1000);
   await expect(page.getByTestId("timer")).toHaveText("24:59");
 });
 
 test("background wake checks the real deadline without inventing missed sessions", async ({ page }) => {
-  await page.clock.install();
-  await ready(page);
+  await readyClock(page);
   await page.getByRole("button", { name: "START", exact: true }).click();
-  await page.clock.setSystemTime(new Date(Date.now() + 6 * 60 * 60_000));
+  await page.clock.setSystemTime(await page.evaluate(() => Date.now() + 6 * 60 * 60_000));
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await expect(page.getByTestId("timer")).toHaveText("05:00");
   await expect(page.getByRole("button", { name: "START", exact: true })).toBeVisible();
   await expect(page.getByText(/SESSION 02/)).toBeVisible();
+});
+
+test("allowed notifications fire once with the correct icon path", async ({ page }) => {
+  await page.addInitScript(() => {
+    const notices: { title: string; options: NotificationOptions }[] = [];
+    (window as unknown as { notices: typeof notices }).notices = notices;
+    window.Notification = class {
+      static permission = "granted";
+      constructor(title: string, options: NotificationOptions) { notices.push({ title, options }); }
+    } as unknown as typeof Notification;
+    localStorage.setItem("focuscape.settings.v1", JSON.stringify({ notifications: true }));
+  });
+  await readyClock(page);
+  await page.getByRole("button", { name: "START", exact: true }).click();
+  await page.clock.fastForward(25 * 60_000);
+  await page.clock.fastForward(30_000);
+  const notices = await page.evaluate(() => (window as unknown as { notices: { title: string; options: NotificationOptions }[] }).notices);
+  expect(notices).toHaveLength(1);
+  expect(notices[0].title).toBe("Focuscape");
+  expect(notices[0].options.body).toContain("集中、おつかれさまでした");
+  expect(notices[0].options.icon).toBe(process.env.TEST_PAGES === "true" ? "/Focuscape/icon.svg" : "/icon.svg");
 });
 
 test("invalid durations stay in the dialog, and the longest supported time fits", async ({ page }) => {
