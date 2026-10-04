@@ -91,6 +91,7 @@ tests/
   audio.test.mjs           PCM波形・音声経路・音量フェード
   dom.test.cjs             React操作と保存の統合テスト
   e2e/focuscape.spec.ts    実ブラウザのタイマー・再生・表示テスト
+  serve-pages.mjs         静的出力を本番のベースパスで配信するテスト用サーバー
 scripts/
   build-pages.cjs         Pages用の静的ビルド
   verify-pages.mjs        HTML・アセット・ベースパスの検証
