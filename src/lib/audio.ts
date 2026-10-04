@@ -102,8 +102,10 @@ export class AmbientAudio {
       this.master.connect(limiter);
       limiter.connect(this.context.destination);
     }
-    if (this.context.state !== "running") await this.context.resume();
-    if (this.context.state !== "running") throw new Error("音を再生できませんでした。もう一度「音を再生」を押してください。");
+    const context = this.context;
+    if (context.state !== "running") await context.resume();
+    if (this.context !== context) return; // Disposed while resume was pending.
+    if (context.state !== "running") throw new Error("音を再生できませんでした。もう一度「音を再生」を押してください。");
   }
 
   update(settings: Settings, playing: boolean, muted: boolean) {
@@ -169,7 +171,7 @@ export class AmbientAudio {
 
   dispose() {
     this.channels.clear(); this.buffers.clear();
-    void this.context?.close();
+    if (this.context && this.context.state !== "closed") void this.context.close().catch(() => {});
     this.context = null; this.master = null;
   }
 }

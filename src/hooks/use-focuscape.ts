@@ -14,10 +14,12 @@ export function useFocuscape() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const audio = useRef<AmbientAudio | null>(null);
+  const playbackRequest = useRef({ id: 0 });
   const settingsRef = useRef(settings);
   const handledCompletion = useRef(0);
 
   useEffect(() => {
+    const requests = playbackRequest.current;
     let stored = DEFAULT_SETTINGS;
     try { stored = parseSettings(localStorage.getItem(STORAGE_KEY)); } catch { /* Private browsing may block storage. */ }
     settingsRef.current = stored;
@@ -26,14 +28,28 @@ export function useFocuscape() {
     setSettings(stored);
     dispatch({ type: "configure", durations: { focus: stored.focusMinutes * 60_000, break: stored.breakMinutes * 60_000 } });
     setReady(true);
-    return () => { audio.current?.dispose(); audio.current = null; };
+    return () => { requests.id++; audio.current?.dispose(); audio.current = null; };
   }, []);
 
   useEffect(() => {
     if (!ready) return;
     settingsRef.current = settings;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* App remains usable without persistence. */ }
-    audio.current?.update(settings, playing, muted);
+  }, [settings, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    try { audio.current?.update(settings, playing, muted); }
+    catch {
+      // Audio failures must not interrupt the independent timer.
+      playbackRequest.current.id++;
+      audio.current?.dispose();
+      audio.current = null;
+      // Report an external audio API failure; disposal prevents repeated updates.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPlaying(false);
+      setError("音を再生できませんでした。もう一度「音を再生」を押してください。");
+    }
   }, [settings, ready, playing, muted]);
 
   useEffect(() => {
@@ -59,7 +75,9 @@ export function useFocuscape() {
     // A reducer completion is an external clock event; announce it once to the UI.
     setMessage(text);
     const current = settingsRef.current;
-    if (current.chime) audio.current?.chime();
+    if (current.chime) {
+      try { audio.current?.chime(); } catch { /* The visible completion still announces the session. */ }
+    }
     if (current.notifications && "Notification" in window && Notification.permission === "granted") {
       try { new Notification("Focuscape", { body: text, icon: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/icon.svg`, tag: "focuscape-session" }); } catch { /* Mobile browsers may not support this constructor. */ }
     }
@@ -70,34 +88,44 @@ export function useFocuscape() {
     document.title = timer.running ? `${formatTime(timer.remainingMs)} · ${label} — Focuscape` : "Focuscape — ひとつのことに、深く。";
   }, [timer.remainingMs, timer.running, timer.phase]);
 
-  const unlockAudio = useCallback(async () => {
+  const playAudio = useCallback(async () => {
+    const request = ++playbackRequest.current.id;
+    // Show the stop control immediately, including while the browser resumes audio.
+    setPlaying(true);
     try {
       audio.current ??= new AmbientAudio();
       await audio.current.unlock();
-      setError("");
-      return true;
+      if (request === playbackRequest.current.id) setError("");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "音を再生できませんでした。もう一度お試しください。");
-      return false;
+      if (request === playbackRequest.current.id) {
+        setPlaying(false);
+        setError(cause instanceof Error ? cause.message : "音を再生できませんでした。もう一度お試しください。");
+      }
     }
   }, []);
+
+  const stopAudio = () => {
+    playbackRequest.current.id++;
+    setPlaying(false);
+  };
 
   const toggleTimer = useCallback(() => {
     if (!ready) return;
     setMessage("");
     dispatch({ type: timer.running ? "pause" : "start", now: Date.now() });
-    if (!timer.running) void unlockAudio().then((ok) => { if (ok) setPlaying(true); });
-  }, [timer.running, ready, unlockAudio]);
+    if (!timer.running) void playAudio();
+  }, [timer.running, ready, playAudio]);
 
   const toggleSound = async (id: SoundId) => {
     const enabling = !settings.sounds[id].enabled;
     setSettings((old) => ({ ...old, sounds: { ...old.sounds, [id]: { ...old.sounds[id], enabled: enabling } } }));
-    if (enabling && await unlockAudio()) setPlaying(true);
+    if (enabling) await playAudio();
+    else if (!Object.entries(settings.sounds).some(([other, sound]) => other !== id && sound.enabled)) stopAudio();
   };
 
   const togglePlayback = async () => {
-    if (playing) { setPlaying(false); return; }
-    if (await unlockAudio()) setPlaying(true);
+    if (playing) { stopAudio(); return; }
+    await playAudio();
   };
 
   const saveSettings = (updated: Settings) => {

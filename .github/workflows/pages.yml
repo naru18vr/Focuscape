@@ -35,6 +35,19 @@ jobs:
         run: npm run verify:pages
       - name: Typecheck
         run: npm run typecheck
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Test static site in browser
+        run: npm run test:e2e
+        env:
+          TEST_PAGES: 'true'
+      - name: Save browser test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-results
+          path: test-results/
+          retention-days: 7
       - name: Disable Jekyll processing
         run: touch out/.nojekyll
       - name: Upload Pages artifact

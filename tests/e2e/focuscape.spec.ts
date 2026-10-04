@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function ready(page: Page) {
-  await page.goto("/");
+  await page.goto("./");
   await expect(page.getByRole("button", { name: "START", exact: true })).toBeEnabled();
 }
 
@@ -128,24 +128,68 @@ test("dialog supports Escape and restores keyboard focus", async ({ page }) => {
 test("corrupt storage and blocked audio preserve timer usability", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("focuscape.settings.v1", "{broken");
-    window.AudioContext = class extends AudioContext { resume(): Promise<void> { return Promise.reject(new Error("Audio blocked")); } };
+    window.AudioContext = class extends AudioContext { constructor() { super(); void this.close(); throw new Error("Audio blocked"); } };
   });
   await page.clock.install();
   await ready(page);
   await page.getByRole("button", { name: "START", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Audio blocked");
   await expect(page.getByRole("button", { name: "PAUSE", exact: true })).toBeVisible();
   await page.clock.fastForward(1000);
   await expect(page.getByTestId("timer")).toHaveText("24:59");
 });
 
-for (const width of [320, 390, 768, 1440]) test(`no overflow or browser errors at ${width}px`, async ({ page }) => {
+test("background wake checks the real deadline without inventing missed sessions", async ({ page }) => {
+  await page.clock.install();
+  await ready(page);
+  await page.getByRole("button", { name: "START", exact: true }).click();
+  await page.clock.setSystemTime(new Date(Date.now() + 6 * 60 * 60_000));
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await expect(page.getByTestId("timer")).toHaveText("05:00");
+  await expect(page.getByRole("button", { name: "START", exact: true })).toBeVisible();
+  await expect(page.getByText(/SESSION 02/)).toBeVisible();
+});
+
+test("invalid durations stay in the dialog, and the longest supported time fits", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await ready(page);
+  await page.getByRole("button", { name: "設定を開く" }).click();
+  await page.getByRole("spinbutton", { name: "集中時間（分）" }).fill("0");
+  await page.getByRole("button", { name: "設定を保存" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("spinbutton", { name: "集中時間（分）" }).fill("180");
+  await page.getByRole("button", { name: "設定を保存" }).click();
+  await expect(page.getByTestId("timer")).toHaveText("180:00");
+  const face = await page.locator(".timer-face").boundingBox();
+  const digits = await page.getByTestId("timer").boundingBox();
+  expect(digits!.width).toBeLessThan(face!.width);
+});
+
+test("blocked browser storage still permits timer and sound controls", async ({ page }) => {
+  await page.addInitScript(() => {
+    Storage.prototype.getItem = () => { throw new DOMException("Unavailable", "SecurityError"); };
+    Storage.prototype.setItem = () => { throw new DOMException("Unavailable", "SecurityError"); };
+  });
+  await ready(page);
+  await page.getByRole("button", { name: "Rain ON", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Rain OFF", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "START", exact: true }).click();
+  await expect(page.getByRole("button", { name: "PAUSE", exact: true })).toBeVisible();
+});
+
+for (const [width, height] of [[320, 844], [390, 844], [768, 1080], [1024, 768], [1366, 768], [1440, 1080]]) test(`no overflow or browser errors at ${width}x${height}`, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.setViewportSize({ width, height: width < 700 ? 844 : 1080 });
+  await page.setViewportSize({ width, height });
   await ready(page);
   await expect(page.getByTestId("timer")).toBeVisible();
   await expect(page.getByRole("button", { name: "Rain ON", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  if (width >= 1024) expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   await page.screenshot({ path: `test-results/focuscape-${width}.png`, fullPage: true });
+  await page.getByRole("button", { name: "設定を開く" }).click();
+  await expect(page.getByRole("button", { name: "設定を保存" })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: `test-results/settings-${width}.png`, fullPage: true });
   expect(errors).toEqual([]);
 });

@@ -30,6 +30,7 @@ test('React UI connects real timer actions, completion messages, mix selections 
   Module._extensions['.ts'] = compile;
   Module._extensions['.tsx'] = compile;
   const { Focuscape } = require('../src/components/focuscape.tsx');
+  const { AmbientAudio } = require('../src/lib/audio.ts');
   Module._resolveFilename = originalResolve;
   Module._extensions['.ts'] = previousTs;
   Module._extensions['.tsx'] = previousTsx;
@@ -114,6 +115,51 @@ test('React UI connects real timer actions, completion messages, mix selections 
     assert.ok(byLabel('選択した環境音を再生'));
     await act(async () => document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true })));
     assert.equal(primary().textContent, 'PAUSE');
+
+    // Browser resume can settle after a later user action. The latest intent wins.
+    const originalUnlock = AmbientAudio.prototype.unlock;
+    const originalUpdate = AmbientAudio.prototype.update;
+    const pending = [];
+    const updates = [];
+    AmbientAudio.prototype.unlock = () => new Promise((resolve, reject) => pending.push({ resolve, reject }));
+    AmbientAudio.prototype.update = (settings, playing) => updates.push(playing && Object.values(settings.sounds).some((sound) => sound.enabled));
+    try {
+      await click(primary());
+      await click(byLabel('選択した環境音を再生'));
+      assert.ok(byLabel('環境音をすべて停止'));
+      await click(byLabel('環境音をすべて停止'));
+      await act(async () => pending.shift().resolve());
+      assert.ok(byLabel('選択した環境音を再生'));
+      assert.equal(updates.at(-1), false);
+
+      await click(byLabel('選択した環境音を再生'));
+      await click(byLabel('Rain OFF'));
+      await click(byLabel('Cafe OFF'));
+      await act(async () => pending.shift().resolve());
+      assert.equal(byLabel('選択した環境音を再生').disabled, true);
+      assert.equal(updates.at(-1), false);
+
+      await click(byLabel('Rain ON'));
+      await click(byLabel('Cafe ON'));
+      const older = pending.shift();
+      const newer = pending.shift();
+      await act(async () => newer.resolve());
+      await act(async () => older.reject(new Error('Old resume request failed')));
+      assert.ok(byLabel('環境音をすべて停止'));
+      assert.equal(container.querySelector('[role="alert"]'), null);
+
+      // A failed audio graph must leave timer controls and completion working.
+      AmbientAudio.prototype.update = (settings, playing) => { if (playing) throw new Error('Graph unavailable'); };
+      await input(byLabel('Master Volume'), '40');
+      assert.match(container.querySelector('[role="alert"]').textContent, /音を再生できませんでした/);
+      await click(primary());
+      await tick(1000);
+      assert.equal(timer(), '49:59');
+      await act(async () => pending.shift().resolve());
+    } finally {
+      AmbientAudio.prototype.unlock = originalUnlock;
+      AmbientAudio.prototype.update = originalUpdate;
+    }
   } finally {
     await act(async () => root.unmount());
     Date.now = originalNow;
