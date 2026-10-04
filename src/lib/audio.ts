@@ -112,7 +112,17 @@ export class AmbientAudio {
       }
     }
     const context = this.context;
-    if (context.state !== "running") await context.resume();
+    if (context.state !== "running") {
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          context.resume(),
+          new Promise<void>((_, reject) => {
+            timeout = setTimeout(() => reject(new AudioPlaybackError("音を再生できませんでした。出力機器を確認して、もう一度「音を再生」を押してください。")), 8000);
+          }),
+        ]);
+      } finally { clearTimeout(timeout); }
+    }
     if (this.context !== context) return; // Disposed while resume was pending.
     if (context.state !== "running") throw new AudioPlaybackError("音を再生できませんでした。もう一度「音を再生」を押してください。");
   }

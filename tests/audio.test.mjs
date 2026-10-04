@@ -170,3 +170,26 @@ test('disposal safely cancels a pending audio resume', async () => {
     assert.equal(FakeContext.instances.at(-1).state, 'closed');
   } finally { window.AudioContext = native; audio.dispose(); }
 });
+
+test('an unavailable audio output times out instead of remaining pending forever', async () => {
+  const audio = new AmbientAudio();
+  const native = window.AudioContext;
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  let expire;
+  let cleared;
+  globalThis.setTimeout = (callback, delay) => { assert.equal(delay, 8000); expire = callback; return 42; };
+  globalThis.clearTimeout = (id) => { cleared = id; };
+  window.AudioContext = class extends FakeContext { resume() { return new Promise(() => {}); } };
+  try {
+    const pending = audio.unlock();
+    expire();
+    await assert.rejects(pending, /出力機器を確認/);
+    assert.equal(cleared, 42);
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+    window.AudioContext = native;
+    audio.dispose();
+  }
+});

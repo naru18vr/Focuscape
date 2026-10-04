@@ -101,6 +101,8 @@ export function useFocuscape() {
       if (request === playbackRequest.current.id) { setError(""); setPendingAudio(false); }
     } catch (cause) {
       if (request === playbackRequest.current.id) {
+        audio.current?.dispose();
+        audio.current = null;
         setPlaying(false);
         setPendingAudio(false);
         setError(cause instanceof AudioPlaybackError ? cause.message : "音を再生できませんでした。もう一度「音を再生」を押してください。");

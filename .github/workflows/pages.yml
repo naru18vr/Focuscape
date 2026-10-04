@@ -37,6 +37,12 @@ jobs:
         run: npm run typecheck
       - name: Install browser
         run: npx playwright install --with-deps chromium firefox webkit
+      - name: Start virtual audio output
+        run: |
+          sudo apt-get install -y pulseaudio
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=focuscape_test
+          pactl set-default-sink focuscape_test
       - name: Test static site in browser
         run: npm run test:e2e
         env:

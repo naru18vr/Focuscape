@@ -30,7 +30,7 @@ npm start
 
 公開先: [https://naru18vr.github.io/Focuscape/](https://naru18vr.github.io/Focuscape/)
 
-GitHubの **Settings → Pages → Build and deployment → Source** は **GitHub Actions** に設定します。`main` へのPushで `.github/workflows/pages.yml` がテスト・Lint・静的ビルド・アセット検証・型チェックを実行し、`out/` を公開します。Actions画面から手動実行することもできます。
+GitHubの **Settings → Pages → Build and deployment → Source** は **GitHub Actions** に設定します。`main` へのPushで `.github/workflows/pages.yml` がテスト・Lint・静的ビルド・アセット検証・型チェックと、Chromium / Firefox / WebKitでの操作テストを実行し、すべて成功した場合に `out/` を公開します。失敗時は公開版を更新しません。Actions画面から手動実行することもできます。
 
 Pages用の出力を手元で検証する場合:
 
@@ -50,9 +50,9 @@ npm run verify:pages
 3. **PAUSE** で一時停止、回転矢印で現在のセッションをリセットします。
 4. 集中終了時は休憩へ、休憩終了時は集中へ切り替わります。初期設定では次のSTARTを待ちます。
 
-音はタイマーとは独立しています。一時停止・リセット・セッション切り替えで音は止まりません。環境音横の「音を停止」、個別カード、Master Volumeのミュートで操作します。通知音もMaster Volumeとミュートに従います。
+音はタイマーとは独立しています。一時停止・リセット・セッション切り替えで音は止まりません。環境音横の「音を停止」、個別カード、Master Volumeのミュートで操作します。再生準備中も停止でき、最後の操作を優先します。通知音もMaster Volumeとミュートに従います。
 
-Spaceキーでも開始・一時停止できます。入力中・ボタン操作中・設定画面表示中はSpaceショートカットを無効にします。
+Spaceキーでも開始・一時停止できます。入力中・日本語変換中・修飾キーとの組み合わせ・ボタン操作中・設定画面表示中はSpaceショートカットを無効にします。
 
 設定アイコンから集中時間（1〜180分）、休憩時間（1〜60分）、通知音、次のセッションの自動開始、任意のブラウザ通知を変更できます。時間の変更は一時停止中に行ってください。時間を変更すると停止中のタイマーは新しい時間にリセットされます。
 
@@ -122,11 +122,13 @@ npm run build
 実ブラウザのテスト:
 
 ```sh
-npx playwright install chromium
+npx playwright install chromium firefox webkit
 npm run test:e2e
 ```
 
-E2Eは320 / 390 / 768 / 1440pxの画面、音声のネイティブWeb Audioグラフ、終了処理、設定保存、キーボードを検証し、`test-results/` にスクリーンショットを保存します。
+E2Eは3つのブラウザエンジンで320 / 390 / 768 / 1024 / 1366 / 1440pxの画面、音声のネイティブWeb Audioグラフ、終了処理、設定保存、通知の呼び出し、キーボードを検証し、`test-results/` にスクリーンショットを保存します。GitHub Actionsの `browser-test-results` から結果を取得できます。
+
+Pagesの静的出力そのものを検証する場合は `npm run build:pages` 後に、PowerShellで `$env:TEST_PAGES='true'; npm run test:e2e`、macOS / Linuxでは `TEST_PAGES=true npm run test:e2e` を実行します。テスト専用サーバーで `/Focuscape/` を配信し、本番と同じアセットパスを確認します。
 
 今回の実行結果と未確認項目は [VALIDATION.md](./VALIDATION.md) を参照してください。
 
