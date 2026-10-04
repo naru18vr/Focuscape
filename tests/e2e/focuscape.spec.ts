@@ -133,7 +133,7 @@ test("corrupt storage and blocked audio preserve timer usability", async ({ page
   await page.clock.install();
   await ready(page);
   await page.getByRole("button", { name: "START", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Audio blocked");
+  await expect(page.locator(".error-message[role=alert]")).toContainText("Audio blocked");
   await expect(page.getByRole("button", { name: "PAUSE", exact: true })).toBeVisible();
   await page.clock.fastForward(1000);
   await expect(page.getByTestId("timer")).toHaveText("24:59");
@@ -177,7 +177,7 @@ test("blocked browser storage still permits timer and sound controls", async ({ 
   await expect(page.getByRole("button", { name: "PAUSE", exact: true })).toBeVisible();
 });
 
-for (const [width, height] of [[320, 844], [390, 844], [768, 1080], [1024, 768], [1366, 768], [1440, 1080]]) test(`no overflow or browser errors at ${width}x${height}`, async ({ page }) => {
+for (const [width, height] of [[320, 844], [390, 844], [768, 1080], [1024, 768], [1366, 768], [1440, 1080]]) test(`no overflow or browser errors at ${width}x${height}`, async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.setViewportSize({ width, height });
@@ -185,11 +185,15 @@ for (const [width, height] of [[320, 844], [390, 844], [768, 1080], [1024, 768],
   await expect(page.getByTestId("timer")).toBeVisible();
   await expect(page.getByRole("button", { name: "Rain ON", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  if (width >= 1024) expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
-  await page.screenshot({ path: `test-results/focuscape-${width}.png`, fullPage: true });
+  await page.screenshot({ path: `test-results/${testInfo.project.name}-focuscape-${width}.png`, fullPage: true });
+  const layout = await page.evaluate(() => ({ height: document.documentElement.scrollHeight, viewport: window.innerHeight }));
+  if (width >= 1024) expect(layout.height, JSON.stringify(layout)).toBeLessThanOrEqual(layout.viewport);
   await page.getByRole("button", { name: "設定を開く" }).click();
   await expect(page.getByRole("button", { name: "設定を保存" })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.screenshot({ path: `test-results/settings-${width}.png`, fullPage: true });
+  const dialogBox = await page.getByRole("dialog").boundingBox();
+  expect(Math.abs(dialogBox!.x + dialogBox!.width / 2 - width / 2)).toBeLessThan(2);
+  expect(Math.abs(dialogBox!.y + dialogBox!.height / 2 - height / 2)).toBeLessThan(2);
+  await page.screenshot({ path: `test-results/${testInfo.project.name}-settings-${width}.png`, fullPage: true });
   expect(errors).toEqual([]);
 });

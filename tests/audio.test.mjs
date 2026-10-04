@@ -140,3 +140,33 @@ test('unsupported audio fails with a clear error instead of failing silently', a
   await assert.rejects(new AmbientAudio().unlock(), /このブラウザでは環境音を再生できません/);
   window.AudioContext = native;
 });
+
+test('failed graph initialization closes the context and permits a clean retry', async () => {
+  const audio = new AmbientAudio();
+  const native = window.AudioContext;
+  window.AudioContext = class extends FakeContext { createDynamicsCompressor() { throw new Error('Graph unavailable'); } };
+  try {
+    await assert.rejects(audio.unlock(), /Graph unavailable/);
+    assert.equal(FakeContext.instances.at(-1).state, 'closed');
+    window.AudioContext = native;
+    await audio.unlock();
+    const settings = structuredClone(DEFAULT_SETTINGS);
+    settings.sounds.rain.enabled = true;
+    audio.update(settings, true, false);
+    assert.equal(FakeContext.instances.at(-1).sources.length, 1);
+  } finally { window.AudioContext = native; audio.dispose(); }
+});
+
+test('disposal safely cancels a pending audio resume', async () => {
+  const audio = new AmbientAudio();
+  const native = window.AudioContext;
+  let release;
+  window.AudioContext = class extends FakeContext { resume() { return new Promise((resolve) => { release = resolve; }); } };
+  try {
+    const pending = audio.unlock();
+    audio.dispose();
+    release();
+    await assert.doesNotReject(pending);
+    assert.equal(FakeContext.instances.at(-1).state, 'closed');
+  } finally { window.AudioContext = native; audio.dispose(); }
+});

@@ -8,7 +8,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: "list",
-  use: { baseURL: pages ? `${origin}/Focuscape/` : origin, browserName: "chromium", trace: "retain-on-failure" },
+  projects: ["chromium", "firefox", "webkit"].map((browserName) => ({ name: browserName, use: { browserName: browserName as "chromium" | "firefox" | "webkit" } })),
+  use: { baseURL: pages ? `${origin}/Focuscape/` : origin, trace: "retain-on-failure" },
   webServer: {
     command: pages ? "node tests/serve-pages.mjs" : "npm run dev",
     url: pages ? `${origin}/Focuscape/` : origin,

@@ -105,7 +105,7 @@ input[type=range]:disabled { opacity: .3; cursor: default; }
 .keyboard-tip { display: flex; align-items: center; gap: 6px; }
 kbd { font-family: inherit; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 9px; }
 .audio-note { font-size: 9px; }
-.settings-dialog { border: 1px solid #3b473e; border-radius: 20px; background: #19211c; color: var(--foreground); width: min(470px,calc(100% - 32px)); padding: 0; max-height: calc(100svh - 48px); box-shadow: 0 30px 120px #0008; }
+.settings-dialog { border: 1px solid #3b473e; border-radius: 20px; background: #19211c; color: var(--foreground); width: min(470px,calc(100% - 32px)); margin: auto; padding: 0; max-height: calc(100svh - 48px); box-shadow: 0 30px 120px #0008; }
 .settings-dialog::backdrop { background: #050b08b8; backdrop-filter: blur(7px); }
 .settings-content { padding: 28px; }
 .dialog-heading { display: flex; align-items: center; justify-content: space-between; }
@@ -129,13 +129,13 @@ kbd { font-family: inherit; padding: 2px 6px; border: 1px solid var(--border); b
 .save-button { width: 100%; background: var(--accent); color: #1c2b1e; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px; border-radius: 10px; font-size: 12px; font-weight: 600; margin-top: 20px; }
 @media (min-width: 1400px) { .timer-section { padding-top: 40px; padding-bottom: 48px; } .timer-face { width: 365px; height: 365px; margin-top: 26px; } .timer-digits { font-size: 106px; } }
 @media (max-width: 900px) { .site-header { padding: 24px 30px; } main { max-width: 790px; } .sound-grid { gap: 8px; } .sound-toggle { padding: 14px 12px 0; } .sound-volume { padding: 17px 12px 15px; gap: 4px; } .sound-name { font-size: 11px; } .sound-subtitle { font-size: 9px; } .mix-status { font-size: 9px; } }
-@media (min-width: 901px) and (max-height: 850px) {
-  .site-header { padding-top: 16px; padding-bottom: 16px; }
-  .timer-section { padding-top: 0; padding-bottom: 24px; }
+@media (min-width: 901px) and (max-height: 1100px) {
+  .site-header { padding-top: 12px; padding-bottom: 12px; }
+  .timer-section { padding-top: 0; padding-bottom: 18px; }
   .intro-line { display: none; }
-  .timer-face { width: 208px; height: 208px; margin-top: 14px; }
-  .timer-digits { font-size: 66px; letter-spacing: -3px; }
-  .timer-digits.long-time { font-size: 55px; }
+  .timer-face { width: clamp(180px,calc(100svh - 588px),340px); height: clamp(180px,calc(100svh - 588px),340px); margin-top: 14px; }
+  .timer-digits { font-size: clamp(66px,8svh,96px); letter-spacing: -3px; }
+  .timer-digits.long-time { font-size: clamp(55px,7svh,78px); }
   .timer-label { font-size: 8px; letter-spacing: 2px; }
   .timer-status { font-size: 9px; margin-top: 8px; }
   .timer-actions { margin-top: 10px; }

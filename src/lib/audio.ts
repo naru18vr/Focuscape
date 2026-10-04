@@ -90,17 +90,24 @@ export class AmbientAudio {
     if (!this.context) {
       const AudioCtor = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtor) throw new Error("このブラウザでは環境音を再生できません。最新版のブラウザでお試しください。");
-      this.context = new AudioCtor();
-      this.master = this.context.createGain();
-      this.master.gain.value = 0;
-      const limiter = this.context.createDynamicsCompressor();
-      limiter.threshold.value = -14;
-      limiter.knee.value = 12;
-      limiter.ratio.value = 8;
-      limiter.attack.value = 0.003;
-      limiter.release.value = 0.25;
-      this.master.connect(limiter);
-      limiter.connect(this.context.destination);
+      const context = new AudioCtor();
+      try {
+        const master = context.createGain();
+        master.gain.value = 0;
+        const limiter = context.createDynamicsCompressor();
+        limiter.threshold.value = -14;
+        limiter.knee.value = 12;
+        limiter.ratio.value = 8;
+        limiter.attack.value = 0.003;
+        limiter.release.value = 0.25;
+        master.connect(limiter);
+        limiter.connect(context.destination);
+        this.context = context;
+        this.master = master;
+      } catch (cause) {
+        void context.close().catch(() => {});
+        throw cause;
+      }
     }
     const context = this.context;
     if (context.state !== "running") await context.resume();

@@ -14,8 +14,9 @@ export function SettingsDialog({ close, settings, running, save }: {
 
   useEffect(() => {
     const element = dialog.current;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     element?.showModal();
-    return () => element?.close();
+    return () => { element?.close(); opener?.focus({ preventScroll: true }); };
   }, []);
 
   const requestNotification = async () => {
@@ -28,7 +29,7 @@ export function SettingsDialog({ close, settings, running, save }: {
     } catch { setNotice("通知を有効にできませんでした。画面内の表示と通知音を使えます。"); }
   };
 
-  return <dialog ref={dialog} className="settings-dialog" onCancel={close} onClick={(event) => { if (event.target === dialog.current) close(); }} aria-labelledby="settings-title">
+  return <dialog ref={dialog} className="settings-dialog" onCancel={(event) => { event.preventDefault(); close(); }} onClick={(event) => { if (event.target === dialog.current) close(); }} aria-labelledby="settings-title">
     <form className="settings-content" onSubmit={(event) => { event.preventDefault(); save(draft); close(); }}>
       <div className="dialog-heading"><div><p className="eyebrow">MAKE IT YOURS</p><h2 id="settings-title">集中の設定</h2></div><button type="button" className="icon-button" aria-label="設定を閉じる" onClick={close}><X size={20} /></button></div>
       <p className="dialog-description">自分のペースで、心地よく。</p>
