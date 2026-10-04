@@ -50,16 +50,23 @@ function SettingsDialog({ onClose, settings, onChange, storageAvailable, permiss
     return () => element?.close();
   }, []);
 
-  return <dialog ref={dialog} className="settings-dialog" aria-labelledby="settings-title" onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+  function closeDialog() {
+    // Close while the dialog is still connected. Removing it first can leave
+    // keyboard focus on the document instead of returning to the trigger.
+    dialog.current?.close();
+    onClose();
+  }
+
+  return <dialog ref={dialog} className="settings-dialog" aria-labelledby="settings-title" onCancel={event => { event.preventDefault(); closeDialog(); }} onClick={event => { if (event.target === event.currentTarget) closeDialog(); }}>
     <div className="dialog-inner">
-      <div className="dialog-heading"><div><span className="eyebrow">MAKE IT YOURS</span><h2 id="settings-title">設定</h2></div><button type="button" className="icon-button" aria-label="設定を閉じる" onClick={onClose}><X size={20} /></button></div>
+      <div className="dialog-heading"><div><span className="eyebrow">MAKE IT YOURS</span><h2 id="settings-title">設定</h2></div><button type="button" className="icon-button" aria-label="設定を閉じる" onClick={closeDialog}><X size={20} /></button></div>
       <div className="settings-session"><div><Leaf size={18} /><span>FOCUS</span><strong>{settings.durations.focus / 60000}<small>分</small></strong></div><ArrowRight size={15} /><div><Moon size={18} /><span>BREAK</span><strong>{settings.durations.break / 60000}<small>分</small></strong></div></div>
       <p className="settings-description">セッション終了後、次のタイマーに切り替わります。準備ができたらSTARTで始めましょう。</p>
       <div className="settings-row"><div><span>終了チャイム</span><p>小さな音で、区切りをお知らせ</p></div><button type="button" role="switch" aria-checked={settings.chime} aria-label="終了チャイム" className={`toggle-switch ${settings.chime ? "on" : ""}`} onClick={() => onChange({ chime: !settings.chime })}><span /></button></div>
       <div className="settings-row"><div><span>ブラウザ通知</span><p>{permission === "unsupported" ? "このブラウザでは利用できません" : permission === "denied" ? "ブラウザのサイト設定から許可できます" : "ほかのタブで作業していてもお知らせ"}</p></div><button type="button" role="switch" aria-checked={settings.notifications && permission === "granted"} aria-label="ブラウザ通知" disabled={permission === "unsupported" || permission === "denied"} className={`toggle-switch ${settings.notifications && permission === "granted" ? "on" : ""}`} onClick={() => { if (settings.notifications && permission === "granted") onChange({ notifications: false }); else void requestNotifications(); }}><span /></button></div>
       <div className="settings-note"><Headphones size={18} /><p>環境音はブラウザ内で生成したオリジナルの合成音です。音はタイマーと独立して再生され、ミュートで一括停止できます。</p></div>
       <p className="storage-note">{storageAvailable ? "設定はこのブラウザに保存されます。" : "このブラウザでは設定を保存できません。現在のページでは通常どおり使えます。"}</p>
-      <button type="button" className="dialog-done" onClick={onClose}>閉じて、集中する<ArrowRight size={15} /></button>
+      <button type="button" className="dialog-done" onClick={closeDialog}>閉じて、集中する<ArrowRight size={15} /></button>
     </div>
   </dialog>;
 }
@@ -69,6 +76,7 @@ export function Focuscape() {
   const { timer, settings, ready, start, pause, reset } = app;
   const mixer = useAmbientMixer(settings);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsTrigger = useRef<HTMLButtonElement>(null);
   const [permission, setPermission] = useReducer((_: Permission, next: Permission) => next, "default");
   const notified = useRef<typeof timer.completion>(null);
   const { chime, play } = mixer;
@@ -105,6 +113,11 @@ export function Focuscape() {
     else { start(); void play(); }
   }
 
+  function closeSettings() {
+    setSettingsOpen(false);
+    settingsTrigger.current?.focus();
+  }
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!ready || settingsOpen || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -136,7 +149,7 @@ export function Focuscape() {
 
   return <div className={`app-shell ${isFocus ? "focus-phase" : "break-phase"}`}>
     <a className="skip-link" href="#focus-timer">タイマーへ移動</a>
-    <header className="app-header"><Brand /><div className="header-actions"><span className="header-note"><span className={`status-dot ${running ? "live" : ""}`} />{running ? (isFocus ? "集中の時間" : "ひと息の時間") : "A quieter place to focus"}</span><span className="header-divider" /><button className="icon-button" type="button" aria-label="設定を開く" onClick={() => setSettingsOpen(true)} disabled={!ready}><Settings2 size={19} strokeWidth={1.6} /></button></div></header>
+    <header className="app-header"><Brand /><div className="header-actions"><span className="header-note"><span className={`status-dot ${running ? "live" : ""}`} />{running ? (isFocus ? "集中の時間" : "ひと息の時間") : "A quieter place to focus"}</span><span className="header-divider" /><button ref={settingsTrigger} className="icon-button" type="button" aria-label="設定を開く" onClick={() => setSettingsOpen(true)} disabled={!ready}><Settings2 size={19} strokeWidth={1.6} /></button></div></header>
 
     <main>
       <div className="intro"><span className="eyebrow"><span />YOUR SPACE. YOUR PACE.</span><h1>ここから、深く集中<span>。</span></h1><p>好きな音を選んで、START。あとは、目の前のことだけ。</p></div>
@@ -164,6 +177,6 @@ export function Focuscape() {
 
     <footer className="app-footer"><p><Leaf size={14} strokeWidth={1.6} />少しの静けさが、大きな一歩に。</p><div className="keyboard-hints"><span><kbd>Space</kbd>開始 / 一時停止</span><span><kbd>R</kbd>リセット</span></div><span className="footer-mark">LESS NOISE. MORE FOCUS.</span></footer>
     <div className="sr-only" aria-live="polite">{!app.storageAvailable ? "設定を保存できません。現在のページでは引き続き利用できます。" : ""}</div>
-    {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} settings={settings} onChange={app.patchSettings} storageAvailable={app.storageAvailable} permission={permission} requestNotifications={requestNotifications} />}
+    {settingsOpen && <SettingsDialog onClose={closeSettings} settings={settings} onChange={app.patchSettings} storageAvailable={app.storageAvailable} permission={permission} requestNotifications={requestNotifications} />}
   </div>;
 }

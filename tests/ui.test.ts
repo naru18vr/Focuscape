@@ -101,4 +101,5 @@ test("settings open, update the chime preference, and close on cancel", () => {
   assert.equal(JSON.parse(testWindow.localStorage.getItem(SETTINGS_KEY)!).chime, false);
   fireEvent(dialog, new testWindow.Event("cancel", { bubbles: false }));
   assert.equal(view.queryByRole("dialog"), null);
+  assert.equal(testWindow.document.activeElement, view.getByRole("button", { name: "設定を開く" }));
 });
