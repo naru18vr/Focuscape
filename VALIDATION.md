@@ -16,6 +16,8 @@
 | HTTPレスポンス | 200 | HTMLに25:00と6種類の環境音があることを確認 |
 | 本番プレビュー・静的アセット | 成功 | 本番サーバー起動、HTMLとJS/CSSを含む7アセットがHTTP 200 |
 | 本番用依存パッケージの監査 | 0件 | `npm audit --omit=dev` |
+| GitHub Pages向け静的ビルド | 成功 | `scripts/build-pages.cjs` で `out/` を生成 |
+| Pagesのアセット参照 | 成功 | タイマー・6音・`/Focuscape/` 配下の8アセット・アイコン・404を検証 |
 
 ### 実際に検証した操作
 
@@ -66,4 +68,4 @@ npm run test:e2e
 
 開発用依存関係の監査には、ESLintのglob依存チェーン（braces / micromatch / fast-glob）に5件のhighが残っています。本番用依存関係には検出がありません。公開時点のbraces最新版3.0.3に修正版がないため、Next.jsのLint設定を古い互換性のない版に強制ダウングレードする変更は行っていません。
 
-ソースコードの反映先は `naru18vr/Focuscape` の `main` ブランチです。ホスティングへのデプロイは未実施です。
+ソースコードの反映先は `naru18vr/Focuscape` の `main` ブランチです。GitHub Pages用のビルド・公開ワークフローを追加しています。最新の公開成否はGitHub Actionsの「Deploy Focuscape to GitHub Pages」で確認できます。

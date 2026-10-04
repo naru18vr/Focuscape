@@ -61,7 +61,7 @@ export function useFocuscape() {
     const current = settingsRef.current;
     if (current.chime) audio.current?.chime();
     if (current.notifications && "Notification" in window && Notification.permission === "granted") {
-      try { new Notification("Focuscape", { body: text, icon: "/icon.svg", tag: "focuscape-session" }); } catch { /* Mobile browsers may not support this constructor. */ }
+      try { new Notification("Focuscape", { body: text, icon: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/icon.svg`, tag: "focuscape-session" }); } catch { /* Mobile browsers may not support this constructor. */ }
     }
   }, [timer.completion]);
 

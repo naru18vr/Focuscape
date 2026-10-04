@@ -26,6 +26,23 @@ npm start
 
 スマートフォンから同じLAN内のPCへアクセスする場合は、開発サーバーを `npm run dev -- --hostname 0.0.0.0` で起動し、PCのLAN IPアドレスのポート3000を開いてください。ブラウザ通知はHTTPSまたはlocalhostが必要です。
 
+## GitHub Pagesで公開
+
+公開先: [https://naru18vr.github.io/Focuscape/](https://naru18vr.github.io/Focuscape/)
+
+GitHubの **Settings → Pages → Build and deployment → Source** は **GitHub Actions** に設定します。`main` へのPushで `.github/workflows/pages.yml` がテスト・Lint・静的ビルド・アセット検証・型チェックを実行し、`out/` を公開します。Actions画面から手動実行することもできます。
+
+Pages用の出力を手元で検証する場合:
+
+```sh
+npm run build:pages
+npm run verify:pages
+```
+
+このビルドだけ `GITHUB_PAGES=true` にし、静的出力と `/Focuscape` のベースパスを適用します。通知アイコンもこのパスに対応しています。Pages用の `out/` は静的Webサーバーで配信し、`next start` は通常の `npm run build` 後に使用します。
+
+`out/` と `.next/` は生成物なのでGitには含めません。通常の `npm run dev` は引き続き [http://127.0.0.1:3000](http://127.0.0.1:3000) で動きます。
+
 ## 使い方
 
 1. 好きな環境音のカードを選びます。選択時に音が流れます。無音でも使えます。
@@ -74,6 +91,11 @@ tests/
   audio.test.mjs           PCM波形・音声経路・音量フェード
   dom.test.cjs             React操作と保存の統合テスト
   e2e/focuscape.spec.ts    実ブラウザのタイマー・再生・表示テスト
+scripts/
+  build-pages.cjs         Pages用の静的ビルド
+  verify-pages.mjs        HTML・アセット・ベースパスの検証
+.github/workflows/
+  pages.yml              テスト・ビルド・Pagesへの自動公開
 ```
 
 Next.js / React / TypeScript / Tailwind CSS、状態管理はReactのみです。CSSの色変数と `app-shell` のテーマを分離し、ライト・システムテーマを追加しやすくしています。
@@ -122,4 +144,4 @@ E2Eは320 / 390 / 768 / 1440pxの画面、音声のネイティブWeb Audioグ�
 
 次の開発候補は、ライセンスが明確な自然録音による音質向上、サウンドミックスの保存、Light / Systemテーマ、全画面・タイマーだけのFocus Modeです。
 
-ソースコードの反映先は `naru18vr/Focuscape` の `main` ブランチです。本番公開は未実施です。
+ソースコードの反映先は `naru18vr/Focuscape` の `main` ブランチ、公開先はGitHub Pagesです。最新の公開結果はGitHub Actionsの「Deploy Focuscape to GitHub Pages」で確認できます。

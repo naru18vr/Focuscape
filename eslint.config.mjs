@@ -5,7 +5,7 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  // This test installs a temporary CommonJS loader for the actual TSX source.
-  { files: ["tests/dom.test.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
+  // CommonJS is intentional for the TSX test loader and the portable build CLI.
+  { files: ["tests/dom.test.cjs", "scripts/build-pages.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
   globalIgnores([".next/**", "out/**", "next-env.d.ts", "test-results/**", "playwright-report/**"]),
 ]);

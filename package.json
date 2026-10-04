@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "next dev --webpack --hostname 127.0.0.1",
     "build": "next build --webpack",
+    "build:pages": "node scripts/build-pages.cjs",
+    "verify:pages": "node scripts/verify-pages.mjs",
     "start": "next start --hostname 127.0.0.1",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
